@@ -1,0 +1,17 @@
+checkpoints/
+*.pt
+.venv/
+task2/runs/
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
+
+# LaTeX build files
+report/*.aux
+report/*.bbl
+report/*.blg
+report/*.fls
+report/*.log
+report/*.out
+report/*.fdb_latexmk
+report/*.synctex.gz
