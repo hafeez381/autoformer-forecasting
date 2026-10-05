@@ -126,7 +126,10 @@ def main(argv=None):
             losses.append(loss.item())
         sched.step()
         sec = time.time() - t0
-        entry = {"epoch": epoch, "epochs_completed": epoch, "train_loss": float(np.mean(losses)), "sec": sec}
+        entry = {"epoch": epoch, "epochs_completed": epoch, "train_loss": float(np.mean(losses)), "sec": sec,
+                 "steps": len(losses), "sec_per_step": sec / len(losses)}
+        if a.device == "cuda":
+            entry["max_mem_mb"] = torch.cuda.max_memory_allocated() / 2 ** 20
         if not a.final:
             p = predict(model, a, ys, Xs, origins, scaler)
             m = metrics(y_val, p)
