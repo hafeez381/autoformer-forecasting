@@ -1,0 +1,21 @@
+{
+ "exog": "exog-future",
+ "candidate": "exog-future+L720",
+ "adopted": [
+  "L720"
+ ],
+ "args": [
+  "--exog",
+  "future",
+  "--seq-len",
+  "720"
+ ],
+ "E_star": 2,
+ "ensemble_seeds": [
+  0,
+  1,
+  2,
+  3,
+  4
+ ]
+}

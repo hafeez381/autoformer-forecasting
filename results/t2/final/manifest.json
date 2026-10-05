@@ -1,0 +1,39 @@
+{
+ "git": "edce86de0239d40c15133b1ad02783d7be86980e",
+ "candidate": "exog-future+L720",
+ "args": [
+  "--exog",
+  "future",
+  "--seq-len",
+  "720"
+ ],
+ "members": [
+  "final_exog-future+L720_s0",
+  "final_exog-future+L720_s1",
+  "final_exog-future+L720_s2",
+  "final_exog-future+L720_s3",
+  "final_exog-future+L720_s4"
+ ],
+ "P": 152965,
+ "P_per_member": [
+  30593,
+  30593,
+  30593,
+  30593,
+  30593
+ ],
+ "E": 10,
+ "E_per_member": [
+  2,
+  2,
+  2,
+  2,
+  2
+ ],
+ "E_star": 2,
+ "forecast_sha256": "94c0763a805505d2c7b7a1f1d54970a14c514691418353d8921a6e14e3149c44",
+ "submission_sha256": "061fa612a5410507f88551ed0146859203a3fa0b44b1931ab0252c0a50c77cc5",
+ "forecast_mean": 98.10962761320286,
+ "forecast_min": 0.0,
+ "forecast_max": 180.4643052656107
+}
