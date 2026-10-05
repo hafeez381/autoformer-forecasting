@@ -1,6 +1,7 @@
 """Aggregate per-(seed, origin) rows, apply the tie rule, and choose the final configuration.
 
-    python -m task2.compare --stage screen    -> results/t2/screen_rows.csv, screen_summary.csv, selection.json
+    python -m task2.compare --stage exog      -> results/t2/exog_rows.csv, exog_summary.csv, selection.json (exog)
+    python -m task2.compare --stage arms      -> results/t2/arms_rows.csv, arms_summary.csv, selection.json (candidate)
     python -m task2.compare --stage confirm   -> results/t2/candidate_rows.csv, candidate_summary.csv,
                                                  ensemble_rows.csv; adds E_star to selection.json
 
@@ -19,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 from task2.data import load, metrics, targets, val_origins
-from task2.sweep import ARMS, FINAL_SEEDS, SCREEN_SEEDS, SELECTION
+from task2.sweep import EXOG_ARMS, FINAL_SEEDS, RANK_ARMS, SCREEN_SEEDS, SELECTION
 from task2.train import RUNS
 
 OUT = SELECTION.parent
@@ -72,30 +73,45 @@ def write_checked(rows, name):
     return s
 
 
-def screen():
-    rows = read_rows([f"{arm}_s{s}" for arm in ARMS for s in SCREEN_SEEDS])
-    s = write_checked(rows, "screen").set_index("arm")
-    base = s.loc["exog-none"]
-    s[["diff_vs_none", "se_diff", "verdict"]] = [verdict(s.loc[a], base) for a in s.index]
-    s.loc["exog-none", "verdict"] = "base"
-    s.to_csv(OUT / "screen_summary.csv")
+def judge(arms, base, name):
+    """Summarise the arms' rows, write <name>_rows.csv and <name>_summary.csv, and give each arm
+    its tie-rule verdict against `base`."""
+    rows = read_rows([f"{arm}_s{s}" for arm in arms for s in SCREEN_SEEDS])
+    s = write_checked(rows, name).set_index("arm")
+    s[["diff_vs_base", "se_diff", "verdict"]] = [verdict(s.loc[a], s.loc[base]) for a in s.index]
+    s.loc[base, "verdict"] = "base"
+    s.to_csv(OUT / f"{name}_summary.csv")
     print(s[["n_seeds", "E_star", "rmse_mean", "rmse_sd", "mae_mean", "smape_mean", "bias_mean",
-             "block_rmse_sd", "P", "diff_vs_none", "se_diff", "verdict"]].round(3).to_string())
-
-    resolved = (s.verdict.isin(["better", "worse"])).sum()
-    print(f"seed-noise gate: {resolved}/{len(s) - 1} arms differ from base by > 2 SE -> "
+             "block_rmse_sd", "P", "diff_vs_base", "se_diff", "verdict"]].round(3).to_string())
+    resolved = s.verdict.isin(["better", "worse"]).sum()
+    print(f"seed-noise gate: {resolved}/{len(s) - 1} arms differ from {base} by > 2 SE -> "
           f"{'PASS' if resolved else 'BREACH (keep the base config)'}")
-    exog_better = [a for a in ("exog-past", "exog-future", "exog-both") if s.loc[a, "verdict"] == "better"]
-    exog = min(exog_better, key=lambda a: s.loc[a, "rmse_mean"]) if exog_better else "exog-none"
-    print(f"exog gate: chosen {exog} ({'beats none by > 2 SE' if exog_better else 'no arm beats none by > 2 SE'}) -> PASS")
-    adopted = [a for a in ("L168", "L720", "log1p", "k49", "lr1e-3") if s.loc[a, "verdict"] == "better"]
+    return s
+
+
+def exog():
+    s = judge(list(EXOG_ARMS), "exog-none", "exog")
+    better = [a for a in ("exog-past", "exog-future", "exog-both") if s.loc[a, "verdict"] == "better"]
+    chosen = min(better, key=lambda a: s.loc[a, "rmse_mean"]) if better else "exog-none"
+    # Among arms that beat none, a tie with the cheaper arm keeps the cheaper one.
+    for a in better:
+        if a != chosen and s.loc[a, "P"] < s.loc[chosen, "P"] and verdict(s.loc[chosen], s.loc[a])[2] == "tie":
+            chosen = a
+    print(f"exog gate: chosen {chosen} ({'beats none by > 2 SE' if better else 'no arm beats none by > 2 SE'}) -> PASS")
+    SELECTION.write_text(json.dumps({"exog": chosen}, indent=1))
+
+
+def arms():
+    sel = json.loads(SELECTION.read_text())
+    base = sel["exog"]
+    s = judge([base] + [f"{base}+{a}" for a in RANK_ARMS], base, "arms")
+    adopted = [a for a in RANK_ARMS if s.loc[f"{base}+{a}", "verdict"] == "better"]
     if "L168" in adopted and "L720" in adopted:
-        adopted.remove(max(("L168", "L720"), key=lambda a: s.loc[a, "rmse_mean"]))
-    changes = ([exog] if exog != "exog-none" else []) + adopted
-    name = changes[0] if len(changes) == 1 else ("exog-none" if not changes else "cand-" + "+".join(changes))
-    args = [x for c in changes for x in ARMS[c]]
-    SELECTION.write_text(json.dumps({"candidate": name, "changes_from_base": changes, "args": args}, indent=1))
-    print(f"candidate: {name}  args: {args}")
+        adopted.remove(max(("L168", "L720"), key=lambda a: s.loc[f"{base}+{a}", "rmse_mean"]))
+    sel.update(candidate="+".join([base] + adopted), adopted=adopted,
+               args=EXOG_ARMS[base] + [x for a in adopted for x in RANK_ARMS[a]])
+    SELECTION.write_text(json.dumps(sel, indent=1))
+    print(f"candidate: {sel['candidate']}  args: {sel['args']}")
 
 
 def confirm():
@@ -127,5 +143,5 @@ def confirm():
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--stage", choices=["screen", "confirm"], required=True)
-    {"screen": screen, "confirm": confirm}[p.parse_args().stage]()
+    p.add_argument("--stage", choices=["exog", "arms", "confirm"], required=True)
+    {"exog": exog, "arms": arms, "confirm": confirm}[p.parse_args().stage]()

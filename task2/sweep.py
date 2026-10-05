@@ -1,10 +1,12 @@
 """Run training arms as parallel processes on one machine.
 
-    python -m task2.sweep --phase screen  --mode full --jobs 6   # exog ablation + ranking arms, seeds 0-2
+    python -m task2.sweep --phase exog    --mode full --jobs 6   # external-data ablation, seeds 0-2
+    python -m task2.sweep --phase arms    --mode full --jobs 6   # ranking arms on top of the chosen exog arm
     python -m task2.sweep --phase confirm --mode full --jobs 6   # selected candidate, seeds 0-4 (missing ones)
     python -m task2.sweep --phase final   --mode full --jobs 6   # refit seeds 0-4 on all rows for E* epochs
 
-Arms differ from the base config (L2=336, kernel 25, lr 1e-4, raw target, no exog) in exactly one setting.
+Each exog arm differs from the base config (L2=336, kernel 25, lr 1e-4, raw target, no exog) only in
+where the covariates enter; each ranking arm differs from the chosen exog arm in exactly one setting.
 """
 import task2.guards  # noqa: F401
 
@@ -21,28 +23,35 @@ from task2.train import RUNS, parse_args
 
 SELECTION = Path(__file__).resolve().parents[1] / "results" / "t2" / "selection.json"
 SCREEN_SEEDS, FINAL_SEEDS = [0, 1, 2], [0, 1, 2, 3, 4]
-ARMS = {
-    # External-data ablation: where the ten covariates enter.
+EXOG_ARMS = {   # external-data ablation: where the ten covariates enter
     "exog-none": [], "exog-past": ["--exog", "past"], "exog-future": ["--exog", "future"],
     "exog-both": ["--exog", "both"],
-    # Ranking arms, each against exog-none.
-    "L168": ["--seq-len", "168"], "L720": ["--seq-len", "720"], "log1p": ["--log1p"],
-    "k49": ["--moving-avg", "49"], "lr1e-3": ["--lr", "1e-3"],
 }
+RANK_ARMS = {   # ranking arms, each against the chosen exog arm
+    "L168": ["--seq-len", "168"], "L720": ["--seq-len", "720"], "log1p": ["--log1p"],
+    "k49": ["--moving-avg", "49"], "lr1e-3": ["--lr", "1e-3"], "d64": ["--d-model", "64"],
+}
+ARMS = {**EXOG_ARMS, **RANK_ARMS}
 
 
-def check_one_change(arm, args):
-    base, arm_cfg = vars(parse_args(["--mode", "full"])), vars(parse_args(["--mode", "full"] + args))
+def check_one_change(base_args, args):
+    base, arm_cfg = vars(parse_args(["--mode", "full"] + base_args)), vars(parse_args(["--mode", "full"] + base_args + args))
     changed = [k for k in base if base[k] != arm_cfg[k]]
-    assert len(changed) <= 1 and (arm == "exog-none") == (not changed), f"{arm} changes {changed}"
+    assert len(changed) == (1 if args else 0), f"{args} changes {changed}"
 
 
 def specs(phase):
-    if phase == "screen":
-        for arm, args in ARMS.items():
-            check_one_change(arm, args)
-        return [(f"{arm}_s{s}", args + ["--seed", str(s)]) for arm, args in ARMS.items() for s in SCREEN_SEEDS]
+    if phase == "exog":
+        for args in EXOG_ARMS.values():
+            check_one_change([], args)
+        return [(f"{arm}_s{s}", args + ["--seed", str(s)]) for arm, args in EXOG_ARMS.items() for s in SCREEN_SEEDS]
     sel = json.loads(SELECTION.read_text())
+    if phase == "arms":
+        base = EXOG_ARMS[sel["exog"]]
+        for args in RANK_ARMS.values():
+            check_one_change(base, args)
+        return [(f"{sel['exog']}+{arm}_s{s}", base + args + ["--seed", str(s)])
+                for arm, args in RANK_ARMS.items() for s in SCREEN_SEEDS]
     if phase == "confirm":
         return [(f"{sel['candidate']}_s{s}", sel["args"] + ["--seed", str(s)]) for s in FINAL_SEEDS
                 if not (RUNS / f"{sel['candidate']}_s{s}" / "rows.csv").exists()]
@@ -65,7 +74,7 @@ def run(spec, mode):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--phase", choices=["screen", "confirm", "final"], required=True)
+    p.add_argument("--phase", choices=["exog", "arms", "confirm", "final"], required=True)
     p.add_argument("--mode", choices=["smoke", "full"], required=True)
     p.add_argument("--jobs", type=int, default=4)
     a = p.parse_args()
