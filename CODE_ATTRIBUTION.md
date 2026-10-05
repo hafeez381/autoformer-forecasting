@@ -24,4 +24,3 @@ Where this code deviates from the reference implementation:
 
 ## Other references
 - Validation design, metrics and baselines follow the assignment PDF §2.5–2.6.
-- DLinear (Zeng et al. 2023) is cited in the report only; it is not implemented.
