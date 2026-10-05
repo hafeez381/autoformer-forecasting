@@ -1,0 +1,17 @@
+\begin{tabular}{ll}
+\toprule
+\textbf{Setting} & \textbf{Value} \\
+\midrule
+Covariates & future \\
+Input length $L$ & 720 \\
+Label length & 168 \\
+Moving-average kernel & 25 \\
+Factor $c$ & 1 \\
+$d_{\text{model}}$, heads, $d_{\text{ff}}$ & 32, 4, 64 \\
+Encoder, decoder layers & 2, 1 \\
+Dropout & 0.1 \\
+Optimiser & Adam, lr $0.0001$ halved each epoch, batch 32 \\
+Epochs per member $E^{*}$ & 2 \\
+Ensemble seeds & 0, 1, 2, 3, 4 \\
+\bottomrule
+\end{tabular}

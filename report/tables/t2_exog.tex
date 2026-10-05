@@ -1,0 +1,12 @@
+\begin{tabular}{l c c c c c r}
+\toprule
+\textbf{Model} & RMSE & MAE & sMAPE (\%) & Bias & Block sd & $\mathcal{P}$ \\
+\midrule
+Naive (last-168 mean) & $120.56$ & $99.15$ & $94.96$ & $-0.37$ & $29.01$ & -- \\
+\midrule
+No covariates & $117.31$ $\pm$ $0.33$ & $97.33$ & $95.21$ & $-1.34$ & $26.62$ & $29{,}633$ \\
+Past covariates & $117.20$ $\pm$ $0.37$ & $97.33$ & $94.89$ & $-1.00$ & $27.31$ & $30{,}593$ \\
+Future covariates & $81.48$ $\pm$ $1.62$ & $63.50$ & $74.09$ & $2.94$ & $17.90$ & $30{,}593$ \\
+Past and future & $89.92$ $\pm$ $8.28$ & $71.79$ & $79.48$ & $9.36$ & $22.52$ & $31{,}553$ \\
+\bottomrule
+\end{tabular}
